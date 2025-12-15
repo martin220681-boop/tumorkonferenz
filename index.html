@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tumorkonferenz</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: Arial, sans-serif; background: #f3f4f6; overflow-x: hidden; }
+        .app-container { width: 100%; min-height: 100vh; }
+        .top-bar { background: #2563eb; color: white; padding: 12px; position: sticky; top: 0; z-index: 100; }
+        .top-bar h1 { font-size: 20px; margin-bottom: 8px; }
+        .top-bar-buttons { display: flex; gap: 8px; }
+        .top-bar-buttons button { flex: 1; padding: 8px; border: none; border-radius: 6px; background: white; color: #2563eb; font-weight: 600; cursor: pointer; }
+        .content { padding: 12px; }
+        .patient-card { background: white; padding: 12px; margin-bottom: 8px; border-radius: 8px; border: 2px solid #e5e7eb; }
+        .patient-card.green { background: #dcfce7; border-color: #4ade80; }
+        .patient-card.black { background: #1f2937; color: white; border-color: #1f2937; }
+        .patient-card.blue { background: #dbeafe; border-color: #60a5fa; }
+        .patient-card.selected { border-color: #2563eb; box-shadow: 0 0 0 2px #2563eb; }
+        .patient-name { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+        .patient-dob { font-size: 14px; opacity: 0.7; margin-bottom: 8px; }
+        .patient-actions { display: flex; gap: 8px; }
+        .patient-actions button { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white; cursor: pointer; font-size: 14px; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 400px; }
+        .modal-content h2 { margin-bottom: 16px; font-size: 20px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 14px; }
+        .form-group input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 16px; }
+        .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+        .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; }
+        .btn-primary { background: #2563eb; color: white; flex: 1; }
+        .btn-secondary { background: #e5e7eb; flex: 1; }
+        .detail-view { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .detail-view h2 { font-size: 20px; margin-bottom: 8px; }
+        .detail-view .patient-info { color: #6b7280; margin-bottom: 16px; font-size: 14px; }
+        .section { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+        .section-header { padding: 12px; background: #f9fafb; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+        .section-content { padding: 12px; display: none; }
+        .section-content.active { display: block; }
+        .form-field { margin-bottom: 12px; }
+        .form-field label { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 600; }
+        .form-field input[type="text"],
+        .form-field input[type="date"],
+        .form-field textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 16px; font-family: Arial, sans-serif; }
+        .form-field textarea { resize: vertical; min-height: 60px; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; }
+        .checkbox-group input[type="checkbox"],
+        .checkbox-group input[type="radio"] { width: 20px; height: 20px; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #6b7280; }
+        .back-btn { background: #e5e7eb; padding: 8px 16px; border: none; border-radius: 6px; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
+        .sort-buttons { display: flex; gap: 4px; margin-top: 8px; }
+        .sort-buttons button { flex: 1; padding: 6px; border: 1px solid white; background: rgba(255,255,255,0.2); color: white; border-radius: 4px; font-size: 12px; }
+        .sort-buttons button.active { background: white; color: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="top-bar">
+            <h1>Tumorkonferenz</h1>
+            <div class="top-bar-buttons">
+                <button id="btnAddPatient">+ Add Patient</button>
+                <button id="btnToggleArchive"><span id="archiveText">Archive</span></button>
+            </div>
+            <div class="sort-buttons">
+                <button id="btnSortName" class="active">By Name</button>
+                <button id="btnSortDob">By Date</button>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div id="listView">
+                <div id="patientList"></div>
+                <div id="emptyState" class="empty-state">No patients yet. Tap "Add Patient" to begin.</div>
+            </div>
+            
+            <div id="detailView" style="display: none;">
+                <button class="back-btn" id="btnBack">← Back to List</button>
+                <div id="patientDetail"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="addPatientModal">
+        <div class="modal-content">
+            <h2>Add New Patient</h2>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="inputName" placeholder="Enter patient name">
+            </div>
+            <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" id="inputDob">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="btnSubmitPatient">Add</button>
+                <button class="btn btn-secondary" id="btnCancelPatient">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            patients: [],
+            archivedPatients: [],
+            selectedPatient: null,
+            sortBy: 'name',
+            showArchived: false,
+            expandedSections: {},
+            currentView: 'list'
+        };
+
+        // Load from localStorage
+        function loadData() {
+            try {
+                const saved = localStorage.getItem('tumorkonferenz_patients');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    state.patients = data.patients || [];
+                    state.archivedPatients = data.archivedPatients || [];
+                }
+            } catch (e) {
+                console.log('No saved data');
+            }
+        }
+
+        // Save to localStorage
+        function saveData() {
+            try {
+                localStorage.setItem('tumorkonferenz_patients', JSON.stringify({
+                    patients: state.patients,
+                    archivedPatients: state.archivedPatients
+                }));
+            } catch (e) {
+                console.log('Could not save');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            
+            // Use both click and touchstart for better mobile support
+            const addBtn = document.getElementById('btnAddPatient');
+            addBtn.addEventListener('click', showModal);
+            addBtn.addEventListener('touchstart', function(e) { e.preventDefault(); showModal(); });
+            
+            const submitBtn = document.getElementById('btnSubmitPatient');
+            submitBtn.addEventListener('click', addPatient);
+            submitBtn.addEventListener('touchstart', function(e) { e.preventDefault(); addPatient(); });
+            
+            const cancelBtn = document.getElementById('btnCancelPatient');
+            cancelBtn.addEventListener('click', hideModal);
+            cancelBtn.addEventListener('touchstart', function(e) { e.preventDefault(); hideModal(); });
+            
+            const sortNameBtn = document.getElementById('btnSortName');
+            sortNameBtn.addEventListener('click', () => setSortBy('name'));
+            sortNameBtn.addEventListener('touchstart', function(e) { e.preventDefault(); setSortBy('name'); });
+            
+            const sortDobBtn = document.getElementById('btnSortDob');
+            sortDobBtn.addEventListener('click', () => setSortBy('dob'));
+            sortDobBtn.addEventListener('touchstart', function(e) { e.preventDefault(); setSortBy('dob'); });
+            
+            const archiveBtn = document.getElementById('btnToggleArchive');
+            archiveBtn.addEventListener('click', toggleArchive);
+            archiveBtn.addEventListener('touchstart', function(e) { e.preventDefault(); toggleArchive(); });
+            
+            const backBtn = document.getElementById('btnBack');
+            backBtn.addEventListener('click', showList);
+            backBtn.addEventListener('touchstart', function(e) { e.preventDefault(); showList(); });
+            
+            document.getElementById('addPatientModal').addEventListener('click', function(e) {
+                if (e.target === this) hideModal();
+            });
+            
+            renderPatientList();
+        });
+
+        function showModal() {
+            document.getElementById('addPatientModal').classList.add('active');
+            setTimeout(() => document.getElementById('inputName').focus(), 100);
+        }
+
+        function hideModal() {
+            document.getElementById('addPatientModal').classList.remove('active');
+            document.getElementById('inputName').value = '';
+            document.getElementById('inputDob').value = '';
+        }
+
+        function addPatient() {
+            const name = document.getElementById('inputName').value.trim();
+            const dob = document.getElementById('inputDob').value;
+            
+            if (!name || !dob) {
+                alert('Please enter both name and date of birth');
+                return;
+            }
+            
+            const patient = {
+                id: Date.now(),
+                name: name,
+                dob: dob,
+                behandeling: {},
+                kidneyFunction: '',
+                histologie: {},
+                ct: {},
+                petCt: {},
+                voorgaandeTukos: [],
+                bronchoskopie: {},
+                ebus: {},
+                pallitiv: null,
+                cMRT: {},
+                lungFunction: {},
+                nebendiagnosen: []
+            };
+            
+            state.patients.push(patient);
+            saveData();
+            hideModal();
+            renderPatientList();
+        }
+
+        function setSortBy(sort) {
+            state.sortBy = sort;
+            document.getElementById('btnSortName').classList.toggle('active', sort === 'name');
+            document.getElementById('btnSortDob').classList.toggle('active', sort === 'dob');
+            renderPatientList();
+        }
+
+        function toggleArchive() {
+            state.showArchived = !state.showArchived;
+            document.getElementById('archiveText').textContent = state.showArchived ? 'Active' : 'Archive';
+            renderPatientList();
+        }
+
+        function getPatientColor(patient) {
+            const b = patient.behandeling;
+            if (b.chirurgie?.selected) return 'green';
+            if (b.bestraling?.selected || b.chemotherapie?.selected) return 'black';
+            if (b.anders?.selected || b.onzeker?.selected) return 'blue';
+            return '';
+        }
+
+        function renderPatientList() {
+            const list = state.showArchived ? state.archivedPatients : state.patients;
+            const sorted = [...list].sort((a, b) => {
+                if (state.sortBy === 'name') return a.name.localeCompare(b.name);
+                return new Date(a.dob) - new Date(b.dob);
+            });
+
+            const listEl = document.getElementById('patientList');
+            const emptyEl = document.getElementById('emptyState');
+            
+            if (sorted.length === 0) {
+                listEl.innerHTML = '';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            
+            emptyEl.style.display = 'none';
+            listEl.innerHTML = '';
+            
+            sorted.forEach(p => {
+                const card = document.createElement('div');
+                card.className = `patient-card ${getPatientColor(p)}`;
+                card.innerHTML = `
+                    <div class="patient-name">${p.name}</div>
+                    <div class="patient-dob">${p.dob}</div>
+                    <div class="patient-actions">
+                        <button data-action="view" data-id="${p.id}">View</button>
+                        ${!state.showArchived ? `
+                            <button data-action="archive" data-id="${p.id}">Archive</button>
+                            <button data-action="delete" data-id="${p.id}">Delete</button>
+                        ` : `
+                            <button data-action="unarchive" data-id="${p.id}">Restore</button>
+                        `}
+                    </div>
+                `;
+                
+                // Add event listeners to buttons
+                const buttons = card.querySelectorAll('button[data-action]');
+                buttons.forEach(btn => {
+                    const handleAction = function(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const action = btn.getAttribute('data-action');
+                        const id = parseInt(btn.getAttribute('data-id'));
+                        
+                        if (action === 'view') selectPatient(id);
+                        else if (action === 'archive') archivePatient(id);
+                        else if (action === 'delete') deletePatient(id);
+                        else if (action === 'unarchive') unarchivePatient(id);
+                    };
+                    
+                    btn.addEventListener('click', handleAction);
+                    btn.addEventListener('touchstart', handleAction);
+                });
+                
+                listEl.appendChild(card);
+            });
+        }
+
+        function selectPatient(id) {
+            const list = state.showArchived ? state.archivedPatients : state.patients;
+            state.selectedPatient = JSON.parse(JSON.stringify(list.find(p => p.id === id)));
+            showDetail();
+        }
+
+        function showList() {
+            state.currentView = 'list';
+            document.getElementById('listView').style.display = 'block';
+            document.getElementById('detailView').style.display = 'none';
+        }
+
+        function showDetail() {
+            state.currentView = 'detail';
+            document.getElementById('listView').style.display = 'none';
+            document.getElementById('detailView').style.display = 'block';
+            renderPatientDetail();
+        }
+
+        function archivePatient(id) {
+            const patient = state.patients.find(p => p.id === id);
+            if (patient) {
+                state.archivedPatients.push(patient);
+                state.patients = state.patients.filter(p => p.id !== id);
+                saveData();
+                renderPatientList();
+            }
+        }
+
+        function unarchivePatient(id) {
+            const patient = state.archivedPatients.find(p => p.id === id);
+            if (patient) {
+                state.patients.push(patient);
+                state.archivedPatients = state.archivedPatients.filter(p => p.id !== id);
+                saveData();
+                renderPatientList();
+            }
+        }
+
+        function deletePatient(id) {
+            if (confirm('Delete this patient?')) {
+                state.patients = state.patients.filter(p => p.id !== id);
+                saveData();
+                renderPatientList();
+            }
+        }
+
+        function renderBehandeling() {
+            const opts = ['chirurgie', 'bestraling', 'chemotherapie', 'anders', 'onzeker'];
+            return opts.map(opt => {
+                const data = state.selectedPatient.behandeling[opt] || {};
+                return `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="beh_${opt}" ${data.selected ? 'checked' : ''} 
+                                   onchange="updatePatient('behandeling.${opt}.selected', this.checked)" />
+                            <label for="beh_${opt}" style="text-transform: capitalize; font-weight: 600;">${opt}</label>
+                        </div>
+                        ${data.selected ? `
+                            <div class="form-field">
+                                <label>Date</label>
+                                <input type="date" value="${data.date || ''}" 
+                                       onchange="updatePatient('behandeling.${opt}.date', this.value)" />
+                            </div>
+                            <div class="form-field">
+                                <label>Remark</label>
+                                <textarea onchange="updatePatient('behandeling.${opt}.remark', this.value)">${data.remark || ''}</textarea>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderHistologie() {
+            const opts = ['adenoca', 'plattenepithelca', 'sclc', 'onbekend', 'lk', 'tumor', 'elders'];
+            return opts.map(opt => {
+                const data = state.selectedPatient.histologie[opt] || {};
+                return `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="hist_${opt}" ${data.selected ? 'checked' : ''} 
+                                   onchange="updatePatient('histologie.${opt}.selected', this.checked)" />
+                            <label for="hist_${opt}" style="text-transform: capitalize; font-weight: 600;">${opt}</label>
+                        </div>
+                        ${data.selected ? `
+                            <div class="form-field">
+                                <label>Remark</label>
+                                <textarea onchange="updatePatient('histologie.${opt}.remark', this.value)">${data.remark || ''}</textarea>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderNebendiagnosen() {
+            const diagnoses = state.selectedPatient.nebendiagnosen || [];
+            let html = diagnoses.map((d, i) => `
+                <div class="form-field" style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" value="${d}" placeholder="Diagnosis" 
+                           data-diag-idx="${i}" style="flex: 1;" />
+                    <button data-delete-diag="${i}" style="padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 6px;">✕</button>
+                </div>
+            `).join('');
+            
+            html += `<button data-add-diag="true" style="width: 100%; padding: 12px; border: 2px dashed #d1d5db; border-radius: 6px; background: white; cursor: pointer; margin-top: 8px;">+ Add Diagnosis</button>`;
+            return html;
+        }
+
+        function renderCT() {
+            const data = state.selectedPatient.ct || {};
+            const locations = ['LOL', 'LUL', 'ROL', 'RUL', 'RML', 'zentral links', 'zentral rechts'];
+            
+            let html = `
+                <div class="form-field">
+                    <label>Date</label>
+                    <input type="date" value="${data.date || ''}" onchange="updatePatient('ct.date', this.value)" />
+                </div>
+            `;
+            
+            ['T', 'N', 'M'].forEach(field => {
+                const fieldData = data[field] || {};
+                html += `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="ct_${field}" ${fieldData.selected ? 'checked' : ''} 
+                                   onchange="updatePatient('ct.${field}.selected', this.checked)" />
+                            <label for="ct_${field}" style="font-weight: 600;">${field}</label>
+                        </div>
+                        ${fieldData.selected ? `
+                            <div class="form-field">
+                                <label>Remark</label>
+                                <textarea onchange="updatePatient('ct.${field}.remark', this.value)">${fieldData.remark || ''}</textarea>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            ['Läsion', 'Satellite'].forEach(field => {
+                const fieldData = data[field] || {};
+                html += `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="ct_${field}" ${fieldData.selected ? 'checked' : ''} 
+                                   onchange="updatePatient('ct.${field}.selected', this.checked)" />
+                            <label for="ct_${field}" style="font-weight: 600;">${field}</label>
+                        </div>
+                        ${fieldData.selected ? `
+                            <div class="form-field">
+                                <label>Remark</label>
+                                <textarea onchange="updatePatient('ct.${field}.remark', this.value)">${fieldData.remark || ''}</textarea>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px;">Locations:</label>
+                                ${locations.map(loc => `
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="ct_${field}_${loc}" ${fieldData[loc] ? 'checked' : ''} 
+                                               onchange="updatePatient('ct.${field}.${loc}', this.checked)" />
+                                        <label for="ct_${field}_${loc}">${loc}</label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            return html;
+        }
+
+        function renderPETCT() {
+            const data = state.selectedPatient.petCt || {};
+            const locations = ['LOL', 'LUL', 'ROL', 'RUL', 'RML', 'zentral links', 'zentral rechts'];
+            
+            let html = `
+                <div class="form-field">
+                    <label>Date</label>
+                    <input type="date" value="${data.date || ''}" onchange="updatePatient('petCt.date', this.value)" />
+                </div>
+            `;
+            
+            // T
+            const tData = data.T || {};
+            html += `
+                <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="petct_T" ${tData.selected ? 'checked' : ''} 
+                               onchange="updatePatient('petCt.T.selected', this.checked)" />
+                        <label for="petct_T" style="font-weight: 600;">T</label>
+                    </div>
+                    ${tData.selected ? `
+                        <div class="form-field">
+                            <label>Remark</label>
+                            <textarea onchange="updatePatient('petCt.T.remark', this.value)">${tData.remark || ''}</textarea>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            // N
+            const nData = data.N || {};
+            html += `
+                <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="petct_N" ${nData.selected ? 'checked' : ''} 
+                               onchange="updatePatient('petCt.N.selected', this.checked)" />
+                        <label for="petct_N" style="font-weight: 600;">N</label>
+                    </div>
+                    ${nData.selected ? `
+                        <div class="form-field">
+                            <label>Remark</label>
+                            <textarea onchange="updatePatient('petCt.N.remark', this.value)">${nData.remark || ''}</textarea>
+                        </div>
+                        ${[1, 2, 3].map(num => {
+                            const numData = nData[`n${num}`] || {};
+                            let numHtml = `
+                                <div style="margin-top: 8px;">
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="petct_N${num}" ${numData.selected ? 'checked' : ''} 
+                                               onchange="updatePatient('petCt.N.n${num}.selected', this.checked)" />
+                                        <label for="petct_N${num}">${num}</label>
+                                    </div>
+                            `;
+                            if ((num === 2 || num === 3) && numData.selected) {
+                                numHtml += `<div style="margin-left: 20px;">`;
+                                [2, 4, 5, 6, 7, 8, 9].forEach(subNum => {
+                                    numHtml += `
+                                        <div class="checkbox-group">
+                                            <input type="checkbox" id="petct_N${num}_${subNum}" ${numData[`sub${subNum}`] ? 'checked' : ''} 
+                                                   onchange="updatePatient('petCt.N.n${num}.sub${subNum}', this.checked)" />
+                                            <label for="petct_N${num}_${subNum}">${subNum}</label>
+                                        </div>
+                                    `;
+                                });
+                                numHtml += `</div>`;
+                            }
+                            numHtml += `</div>`;
+                            return numHtml;
+                        }).join('')}
+                    ` : ''}
+                </div>
+            `;
+            
+            // M
+            const mData = data.M || {};
+            html += `
+                <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="petct_M" ${mData.selected ? 'checked' : ''} 
+                               onchange="updatePatient('petCt.M.selected', this.checked)" />
+                        <label for="petct_M" style="font-weight: 600;">M</label>
+                    </div>
+                    ${mData.selected ? `
+                        <div class="form-field">
+                            <label>Remark</label>
+                            <textarea onchange="updatePatient('petCt.M.remark', this.value)">${mData.remark || ''}</textarea>
+                        </div>
+                        ${['1a', '1b', '1c'].map(sub => {
+                            const subData = mData[sub] || {};
+                            let subHtml = `
+                                <div style="margin-top: 8px;">
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="petct_M${sub}" ${subData.selected ? 'checked' : ''} 
+                                               onchange="updatePatient('petCt.M.${sub}.selected', this.checked)" />
+                                        <label for="petct_M${sub}">${sub}</label>
+                                    </div>
+                            `;
+                            if (subData.selected) {
+                                subHtml += `<div style="margin-left: 20px;">`;
+                                ['oss', 'pul', 'bra', 'ple'].forEach(opt => {
+                                    subHtml += `
+                                        <div class="checkbox-group">
+                                            <input type="checkbox" id="petct_M${sub}_${opt}" ${subData[opt] ? 'checked' : ''} 
+                                                   onchange="updatePatient('petCt.M.${sub}.${opt}', this.checked)" />
+                                            <label for="petct_M${sub}_${opt}">${opt}</label>
+                                        </div>
+                                    `;
+                                });
+                                subHtml += `</div>`;
+                            }
+                            subHtml += `</div>`;
+                            return subHtml;
+                        }).join('')}
+                    ` : ''}
+                </div>
+            `;
+            
+            // Läsion and Satellite
+            ['Läsion', 'Satellite'].forEach(field => {
+                const fieldData = data[field] || {};
+                html += `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="petct_${field}" ${fieldData.selected ? 'checked' : ''} 
+                                   onchange="updatePatient('petCt.${field}.selected', this.checked)" />
+                            <label for="petct_${field}" style="font-weight: 600;">${field}</label>
+                        </div>
+                        ${fieldData.selected ? `
+                            <div class="form-field">
+                                <label>Remark</label>
+                                <textarea onchange="updatePatient('petCt.${field}.remark', this.value)">${fieldData.remark || ''}</textarea>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px;">Locations:</label>
+                                ${locations.map(loc => `
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="petct_${field}_${loc}" ${fieldData[loc] ? 'checked' : ''} 
+                                               onchange="updatePatient('petCt.${field}.${loc}', this.checked)" />
+                                        <label for="petct_${field}_${loc}">${loc}</label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            return html;
+        }
+
+        function renderVoorgaandeTukos() {
+            const tukos = state.selectedPatient.voorgaandeTukos || [];
+            let html = tukos.map((tuko, idx) => `
+                <div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-weight: 600;">Tuko ${idx + 1}</span>
+                        <button data-delete-tuko="${idx}" style="padding: 6px 10px; background: #ef4444; color: white; border: none; border-radius: 6px;">✕</button>
+                    </div>
+                    <div class="form-field">
+                        <label>Date</label>
+                        <input type="date" value="${tuko.date || ''}" data-tuko-date="${idx}" />
+                    </div>
+                    <div class="form-field">
+                        <label>Remark</label>
+                        <textarea data-tuko-remark="${idx}">${tuko.remark || ''}</textarea>
+                    </div>
+                </div>
+            `).join('');
+            
+            if (tukos.length < 5) {
+                html += `<button data-add-tuko="true" style="width: 100%; padding: 12px; border: 2px dashed #d1d5db; border-radius: 6px; background: white; cursor: pointer;">+ Add Tuko</button>`;
+            }
+            
+            return html;
+        }
+
+        function addTuko() {
+            const tukos = state.selectedPatient.voorgaandeTukos || [];
+            tukos.push({ date: '', remark: '' });
+            updatePatient('voorgaandeTukos', tukos);
+        }
+
+        function deleteTuko(idx) {
+            const tukos = state.selectedPatient.voorgaandeTukos.filter((_, i) => i !== idx);
+            updatePatient('voorgaandeTukos', tukos);
+        }
+
+        function updateTuko(idx, field, value) {
+            const tukos = [...state.selectedPatient.voorgaandeTukos];
+            tukos[idx][field] = value;
+            updatePatient('voorgaandeTukos', tukos);
+        }
+
+        function renderBronchoskopie() {
+            const data = state.selectedPatient.bronchoskopie || {};
+            return `
+                <div class="form-field">
+                    <label>Date</label>
+                    <input type="date" value="${data.date || ''}" onchange="updatePatient('bronchoskopie.date', this.value)" />
+                </div>
+                <div class="checkbox-group">
+                    <input type="radio" name="bronch_type" id="bronch_unauf" ${data.type === 'unauffällig' ? 'checked' : ''} 
+                           onchange="updatePatient('bronchoskopie.type', 'unauffällig')" />
+                    <label for="bronch_unauf">Unauffällig</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="radio" name="bronch_type" id="bronch_bes" ${data.type === 'besonderheiten' ? 'checked' : ''} 
+                           onchange="updatePatient('bronchoskopie.type', 'besonderheiten')" />
+                    <label for="bronch_bes">Besonderheiten</label>
+                </div>
+                ${data.type === 'besonderheiten' ? `
+                    <div class="form-field">
+                        <label>Besonderheiten Details</label>
+                        <textarea onchange="updatePatient('bronchoskopie.details', this.value)">${data.details || ''}</textarea>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        function renderCMRT() {
+            const data = state.selectedPatient.cMRT || {};
+            return `
+                <div class="form-field">
+                    <label>Date</label>
+                    <input type="date" value="${data.date || ''}" onchange="updatePatient('cMRT.date', this.value)" />
+                </div>
+                <div class="checkbox-group">
+                    <input type="radio" name="cmrt_result" id="cmrt_meta" ${data.result === 'metastases' ? 'checked' : ''} 
+                           onchange="updatePatient('cMRT.result', 'metastases')" />
+                    <label for="cmrt_meta">Metastases</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="radio" name="cmrt_result" id="cmrt_no" ${data.result === 'no_metastases' ? 'checked' : ''} 
+                           onchange="updatePatient('cMRT.result', 'no_metastases')" />
+                    <label for="cmrt_no">No Metastases</label>
+                </div>
+            `;
+        }
+
+        function renderEBUS() {
+            const data = state.selectedPatient.ebus || {};
+            const punctionOpts = ['tumor', 'satellit', 'lymphnode', 'anders'];
+            
+            let html = `
+                <div class="form-field">
+                    <label>Date</label>
+                    <input type="date" value="${data.date || ''}" onchange="updatePatient('ebus.date', this.value)" />
+                </div>
+                <div class="checkbox-group">
+                    <input type="radio" name="ebus_type" id="ebus_no" ${data.type === 'no_punction' ? 'checked' : ''} 
+                           onchange="updatePatient('ebus.type', 'no_punction')" />
+                    <label for="ebus_no">No Punction</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="radio" name="ebus_type" id="ebus_yes" ${data.type === 'punction' ? 'checked' : ''} 
+                           onchange="updatePatient('ebus.type', 'punction')" />
+                    <label for="ebus_yes">Punction</label>
+                </div>
+            `;
+            
+            if (data.type === 'punction') {
+                punctionOpts.forEach(opt => {
+                    const optData = data[opt] || {};
+                    html += `
+                        <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 8px; margin-left: 20px;">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="ebus_${opt}" ${optData.selected ? 'checked' : ''} 
+                                       onchange="updatePatient('ebus.${opt}.selected', this.checked)" />
+                                <label for="ebus_${opt}" style="text-transform: capitalize;">${opt}</label>
+                            </div>
+                            ${optData.selected ? `
+                                <div class="form-field">
+                                    <label>Remark</label>
+                                    <textarea onchange="updatePatient('ebus.${opt}.remark', this.value)">${optData.remark || ''}</textarea>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            }
+            
+            return html;
+        }
+
+        function updatePatient(path, value) {
+            const keys = path.split('.');
+            let current = state.selectedPatient;
+            for (let i = 0; i < keys.length - 1; i++) {
+                if (!current[keys[i]]) current[keys[i]] = {};
+                current = current[keys[i]];
+            }
+            current[keys[keys.length - 1]] = value;
+            
+            const list = state.showArchived ? state.archivedPatients : state.patients;
+            const idx = list.findIndex(p => p.id === state.selectedPatient.id);
+            if (idx !== -1) list[idx] = JSON.parse(JSON.stringify(state.selectedPatient));
+            
+            saveData();
+            renderPatientDetail();
+        }
+
+        function renderPatientDetail() {
+            if (!state.selectedPatient) return;
+
+            let html = `
+                <div class="detail-view">
+                    <h2>${state.selectedPatient.name}</h2>
+                    <div class="patient-info">DOB: ${state.selectedPatient.dob}</div>
+                    
+                    ${renderSection('kidneyFunction', 'Kidney Function', `
+                        <div class="form-field">
+                            <input type="text" placeholder="Enter value" value="${state.selectedPatient.kidneyFunction || ''}" 
+                                   onchange="updatePatient('kidneyFunction', this.value)" />
+                        </div>
+                    `)}
+                    
+                    ${renderSection('behandeling', 'Behandeling', renderBehandeling())}
+                    
+                    ${renderSection('histologie', 'Histologie', renderHistologie())}
+                    
+                    ${renderSection('ct', 'CT', renderCT())}
+                    
+                    ${renderSection('petCt', 'PET CT', renderPETCT())}
+                    
+                    ${renderSection('voorgaandeTukos', "Voorgaande Tuko's", renderVoorgaandeTukos())}
+                    
+                    ${renderSection('bronchoskopie', 'Bronchoskopie', renderBronchoskopie())}
+                    
+                    ${renderSection('cMRT', 'cMRT', renderCMRT())}
+                    
+                    ${renderSection('ebus', 'EBUS', renderEBUS())}
+                    
+                    ${renderSection('lungFunction', 'Lung Function', `
+                        <div class="form-field">
+                            <label>FEV1</label>
+                            <input type="text" value="${state.selectedPatient.lungFunction?.FEV1 || ''}" 
+                                   onchange="updatePatient('lungFunction.FEV1', this.value)" />
+                        </div>
+                        <div class="form-field">
+                            <label>Diffusion</label>
+                            <input type="text" value="${state.selectedPatient.lungFunction?.Diffusion || ''}" 
+                                   onchange="updatePatient('lungFunction.Diffusion', this.value)" />
+                        </div>
+                    `)}
+                    
+                    ${renderSection('pallitiv', 'Pallitiv', `
+                        <div class="checkbox-group">
+                            <input type="radio" name="pallitiv" id="pallYes" ${state.selectedPatient.pallitiv === true ? 'checked' : ''} 
+                                   onchange="updatePatient('pallitiv', true)" />
+                            <label for="pallYes">Yes</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="radio" name="pallitiv" id="pallNo" ${state.selectedPatient.pallitiv === false ? 'checked' : ''} 
+                                   onchange="updatePatient('pallitiv', false)" />
+                            <label for="pallNo">No</label>
+                        </div>
+                    `)}
+                </div>
+            `;
+
+            document.getElementById('patientDetail').innerHTML = html;
+
+            document.querySelectorAll('[data-toggle]').forEach(el => {
+                el.addEventListener('click', function() {
+                    const key = this.dataset.toggle;
+                    state.expandedSections[key] = !state.expandedSections[key];
+                    renderPatientDetail();
+                });
+            });
+            
+            // Add diagnosis button listeners
+            const addDiagBtn = document.querySelector('[data-add-diag]');
+            if (addDiagBtn) {
+                addDiagBtn.addEventListener('click', addDiagnosis);
+            }
+            
+            document.querySelectorAll('[data-delete-diag]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const idx = parseInt(this.getAttribute('data-delete-diag'));
+                    deleteDiagnosis(idx);
+                });
+            });
+            
+            document.querySelectorAll('[data-diag-idx]').forEach(input => {
+                input.addEventListener('change', function() {
+                    const idx = parseInt(this.getAttribute('data-diag-idx'));
+                    updateDiagnosis(idx, this.value);
+                });
+            });
+            
+            // Add tuko button listeners
+            const addTukoBtn = document.querySelector('[data-add-tuko]');
+            if (addTukoBtn) {
+                addTukoBtn.addEventListener('click', addTuko);
+            }
+            
+            document.querySelectorAll('[data-delete-tuko]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const idx = parseInt(this.getAttribute('data-delete-tuko'));
+                    deleteTuko(idx);
+                });
+            });
+            
+            document.querySelectorAll('[data-tuko-date]').forEach(input => {
+                input.addEventListener('change', function() {
+                    const idx = parseInt(this.getAttribute('data-tuko-date'));
+                    updateTuko(idx, 'date', this.value);
+                });
+            });
+            
+            document.querySelectorAll('[data-tuko-remark]').forEach(input => {
+                input.addEventListener('change', function() {
+                    const idx = parseInt(this.getAttribute('data-tuko-remark'));
+                    updateTuko(idx, 'remark', this.value);
+                });
+            });
+        }
+
+        function renderSection(key, label, content) {
+            const expanded = state.expandedSections[key];
+            return `
+                <div class="section">
+                    <div class="section-header" data-toggle="${key}">
+                        <span>${label}</span>
+                        <span>${expanded ? '▼' : '▶'}</span>
+                    </div>
+                    <div class="section-content ${expanded ? 'active' : ''}">
+                        ${content}
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
